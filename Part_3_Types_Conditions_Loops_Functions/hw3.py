@@ -3,14 +3,14 @@
 
 
 class Messages:
-  UNKNOWN_COMMAND = "Неизвестная команда!"
-  NONPOSITIVE_VALUE = "Значение должно быть больше нуля!"
-  INCORRECT_CATEGORY_NAME = (
+  unknown_command = "Неизвестная команда!"
+  nonpositive_value = "Значение должно быть больше нуля!"
+  incorrect_category_name = (
     "Имя категории должно быть одним словом без точек и запятых"
   )
-  INCORRECT_DATE = "Неправильная дата!"
-  OP_SUCCESS = "Добавлено"
-  STATS_TEMPLATE = """Ваша статистика по состоянию на {date}:
+  incorrect_date = "Неправильная дата!"
+  op_success = "Добавлено"
+  stats_template = """Ваша статистика по состоянию на {date}:
 Суммарный капитал: {total_capital:.2f} рублей
 В этом месяце {status} составил{status_suffix} {month_diff:.2f} рублей
 Доходы: {month_income:.2f} рублей
@@ -20,20 +20,20 @@ class Messages:
 
 
 class Commands:
-  INCOME = "income"
-  COST = "cost"
-  STATS = "stats"
+  income = "income"
+  cost = "cost"
+  stats = "stats"
 
 
 class Dates:
-  MONTHS_WITH_31_DAYS = (1, 3, 5, 7, 8, 10, 12)
-  MONTHS_WITH_30_DAYS = (4, 6, 9, 11)
-  FEBRUARY_MONTH = 2
-  MAX_DAY_IN_MONTH = 31
-  MAX_DAY_IN_SHORT_MONTH = 30
-  MONTHS_IN_YEAR = 12
-  FEBRUARY_LEAP_DAYS = 29
-  FEBRUARY_DAYS = 28
+  months_with_thirty_one_days = (1, 3, 5, 7, 8, 10, 12)
+  months_with_thirty_days = (4, 6, 9, 11)
+  february_month = 2
+  max_day_in_month = 31
+  max_day_in_short_month = 30
+  months_in_year = 12
+  february_leap_days = 29
+  february_days = 28
 
 
 class Income:
@@ -62,33 +62,33 @@ def main() -> None:
   cost_list: list[Cost] = []
 
   while True:
-    try:
-      inp = input("Введите команду: ")
-    except EOFError:
-      break
+    inp = input("Введите команду: ")
+    parse_input(inp, income_list, cost_list)
 
-    command_parts = inp.split()
-    if len(command_parts) == 0:
-      continue
 
-    command = command_parts[0]
-    args = command_parts[1:]
+def parse_input(inp: str, income_list: list[Income], cost_list: list[Cost]) -> None:
+  command_parts = inp.split()
+  if len(command_parts) == 0:
+    return
 
-    match command:
-      case Commands.INCOME:
-        handle_income(args, income_list)
-      case Commands.COST:
-        handle_cost(args, cost_list)
-      case Commands.STATS:
-        handle_stats(args, income_list, cost_list)
-      case _:
-        print(Messages.UNKNOWN_COMMAND)
+  command = command_parts[0]
+  args = command_parts[1:]
+
+  match command:
+    case Commands.income:
+      handle_income(args, income_list)
+    case Commands.cost:
+      handle_cost(args, cost_list)
+    case Commands.stats:
+      handle_stats(args, income_list, cost_list)
+    case _:
+      print(Messages.unknown_command)
 
 
 def handle_income(args: list[str], income_list: list[Income]) -> None:
   income_args_count = 2
   if len(args) != income_args_count:
-    print(Messages.UNKNOWN_COMMAND)
+    print(Messages.unknown_command)
     return
 
   amount_str, date_str = args
@@ -96,21 +96,21 @@ def handle_income(args: list[str], income_list: list[Income]) -> None:
   extracted_amount = extract_amount(amount_str)
 
   if extracted_amount is None:
-    print(Messages.NONPOSITIVE_VALUE)
+    print(Messages.nonpositive_value)
     return
 
   if extracted_date is None:
-    print(Messages.INCORRECT_DATE)
+    print(Messages.incorrect_date)
     return
 
   income_list.append(Income(extracted_amount, extracted_date))
-  print(Messages.OP_SUCCESS)
+  print(Messages.op_success)
 
 
 def handle_cost(args: list[str], cost_list: list[Cost]) -> None:
   cost_args_count = 3
   if len(args) != cost_args_count:
-    print(Messages.UNKNOWN_COMMAND)
+    print(Messages.unknown_command)
     return
 
   category_name, amount_str, date_str = args
@@ -118,33 +118,33 @@ def handle_cost(args: list[str], cost_list: list[Cost]) -> None:
   extracted_amount = extract_amount(amount_str)
 
   if len(category_name) == 0 or any(char in category_name for char in ".,"):
-    print(Messages.INCORRECT_CATEGORY_NAME)
+    print(Messages.incorrect_category_name)
     return
 
   if extracted_amount is None:
-    print(Messages.NONPOSITIVE_VALUE)
+    print(Messages.nonpositive_value)
     return
 
   if extracted_date is None:
-    print(Messages.INCORRECT_DATE)
+    print(Messages.incorrect_date)
     return
 
   cost_list.append(Cost(category_name, extracted_amount, extracted_date))
-  print(Messages.OP_SUCCESS)
+  print(Messages.op_success)
 
 
 def handle_stats(args: list[str], income_list: list[Income],
     cost_list: list[Cost]) -> None:
   stats_args_count = 1
   if len(args) != stats_args_count:
-    print(Messages.UNKNOWN_COMMAND)
+    print(Messages.unknown_command)
     return
 
   date_str = args[0]
   date_val = extract_date(date_str)
 
   if date_val is None:
-    print(Messages.INCORRECT_DATE)
+    print(Messages.incorrect_date)
     return
 
   total_capital = count_total_capital(date_val, income_list, cost_list)
@@ -162,7 +162,7 @@ def handle_stats(args: list[str], income_list: list[Income],
     status_text = "убыток"
     status_suffix_text = ""
 
-  print(Messages.STATS_TEMPLATE.format(
+  print(Messages.stats_template.format(
       date=date_str,
       total_capital=total_capital,
       status=status_text,
@@ -234,16 +234,16 @@ def extract_amount(amount: str) -> float | None:
 
 
 def is_valid_date(day: int, month: int, year: int) -> bool:
-  if day < 1 or day > Dates.MAX_DAY_IN_MONTH or \
-      month < 1 or month > Dates.MONTHS_IN_YEAR or year < 0:
+  if day < 1 or day > Dates.max_day_in_month or \
+      month < 1 or month > Dates.months_in_year or year < 0:
     return False
 
-  if month in Dates.MONTHS_WITH_30_DAYS and day > Dates.MAX_DAY_IN_SHORT_MONTH:
+  if month in Dates.months_with_thirty_days and day > Dates.max_day_in_short_month:
     return False
 
-  if month == Dates.FEBRUARY_MONTH:
-    max_feb_day = Dates.FEBRUARY_LEAP_DAYS if is_leap_year(year) \
-      else Dates.FEBRUARY_DAYS
+  if month == Dates.february_month:
+    max_feb_day = Dates.february_leap_days if is_leap_year(year) \
+      else Dates.february_days
     return day <= max_feb_day
 
   return True
