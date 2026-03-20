@@ -1,8 +1,59 @@
 #!/usr/bin/env python
 # ruff: noqa: T201, RUF001
 
+def main() -> None:
+    while True:
+        line = input("Введите команду: ")
+        if not line:
+            break
+
+        inp = line.split()
+        if not inp:
+            continue
+
+        match inp:
+            case ["income", amount, date]:
+                income_handler(amount, date)
+            case ["cost", category, amount, date]:
+                cost_handler(category, amount, date)
+            case ["stats", date]:
+                stats_handler(date)
+            case _:
+                print("Неизвестная команда!")
+
+
+class Income:
+    def __init__(self, amount: float, date: tuple[int, int, int]) -> None:
+        self.amount: float = amount
+        self.date: tuple[int, int, int] = date
+
+    def __getitem__(self, item: int) -> float | tuple[int, int, int] | None:
+        if item == 0:
+            return self.amount
+        if item == 1:
+            return self.date
+        return None
+
+
+class Cost:
+    def __init__(self, category_name: str, amount: float,
+        date: tuple[int, int, int]) -> None:
+        self.category_name: str = category_name
+        self.amount: float = amount
+        self.date: tuple[int, int, int] = date
+
+    def __getitem__(self, item: int) -> str | float | tuple[int, int, int]:
+        if item == 0:
+            return self.category_name
+        if item == 1:
+            return self.amount
+        if item == 2:
+            return self.date
+        raise IndexError
+
+
 financial_transactions_storage: list[Income | Cost] = []
-EXPENSE_CATEGORIES: list[str] = []
+EXPENSE_CATEGORIES: dict[str, str] = {}
 
 INCORRECT_DATE_MSG: str = "Неправильная дата!"
 NONPOSITIVE_VALUE_MSG: str = "Значение должно быть больше нуля!"
@@ -29,61 +80,51 @@ class Dates:
     february_days: int = 28
 
 
-class Income:
-    def __init__(self, amount: float, date: tuple[int, int, int]) -> None:
-        self.amount: float = amount
-        self.date: tuple[int, int, int] = date
-
-
-class Cost:
-    def __init__(self, category_name: str, amount: float,
-        date: tuple[int, int, int]) -> None:
-        self.category_name: str = category_name
-        self.amount: float = amount
-        self.date: tuple[int, int, int] = date
-
-
-def income_handler(amount_str: str, date_str: str) -> None:
-    extracted_amount = extract_amount(amount_str)
+def income_handler(amount_str: str | float, date_str: str) -> bool:
+    extracted_amount = extract_amount(str(amount_str))
     extracted_date = extract_date(date_str)
 
     if extracted_amount is None:
         print(NONPOSITIVE_VALUE_MSG)
-        return
+        return False
     if extracted_date is None:
         print(INCORRECT_DATE_MSG)
-        return
+        return False
 
     financial_transactions_storage.append(
         Income(extracted_amount, extracted_date))
     print(OP_SUCCESS_MSG)
+    return True
 
 
-def cost_handler(category_name: str, amount_str: str, date_str: str) -> None:
-    extracted_amount = extract_amount(amount_str)
+def cost_handler(category_name: str, amount_str: str | float,
+    date_str: str) -> bool:
+    extracted_amount = extract_amount(str(amount_str))
     extracted_date = extract_date(date_str)
 
     if len(category_name) == 0 or any(char in category_name for char in ".,"):
         print(NOT_EXISTS_CATEGORY)
-        return
+        return False
     if extracted_amount is None:
         print(NONPOSITIVE_VALUE_MSG)
-        return
+        return False
     if extracted_date is None:
         print(INCORRECT_DATE_MSG)
-        return
+        return False
 
     if category_name not in EXPENSE_CATEGORIES:
-        EXPENSE_CATEGORIES.append(category_name)
+        EXPENSE_CATEGORIES[category_name] = category_name
 
     financial_transactions_storage.append(
         Cost(category_name, extracted_amount, extracted_date))
     print(OP_SUCCESS_MSG)
+    return True
 
 
-def cost_categories_handler() -> None:
-    for index, category in enumerate(sorted(EXPENSE_CATEGORIES), 1):
+def cost_categories_handler() -> dict[str, str]:
+    for index, category in enumerate(sorted(EXPENSE_CATEGORIES.keys()), 1):
         print(f"{index}. {category}")
+    return EXPENSE_CATEGORIES
 
 
 def stats_handler(date_str: str) -> None:
@@ -104,9 +145,9 @@ def stats_handler(date_str: str) -> None:
     month_cost = [c.amount for c in cost_list if
                   is_same_month(c.date, date_val)]
 
-    m_inc_sum = sum(month_income)
-    m_cost_sum = sum(month_cost)
-    month_diff = m_inc_sum - m_cost_sum
+    total_month_income = sum(month_income)
+    total_month_cost = sum(month_cost)
+    month_diff = total_month_income - total_month_cost
 
     status_text = "прибыль" if month_diff >= 0 else "убыток"
     status_suffix_text = "а" if month_diff >= 0 else ""
@@ -117,13 +158,14 @@ def stats_handler(date_str: str) -> None:
         status=status_text,
         status_suffix=status_suffix_text,
         month_diff=abs(month_diff),
-        month_income=m_inc_sum,
-        month_cost=m_cost_sum
+        month_income=total_month_income,
+        month_cost=total_month_cost
     ))
 
     current_month_costs = [c for c in cost_list if
                            is_same_month(c.date, date_val)]
     categories_sum = get_categories_map(current_month_costs)
+
     for index, category in enumerate(sorted(categories_sum.keys()), 1):
         print(f"{index}. {category}: {categories_sum[category]:.0f}")
 
@@ -138,11 +180,11 @@ def get_categories_map(costs: list[Cost]) -> dict[str, float]:
 def count_total_capital(threshold: tuple[int, int, int],
     income_list: list[Income],
     cost_list: list[Cost]) -> float:
-    t_inc = sum(i.amount for i in income_list if
-                is_date_before_or_equal(i.date, threshold))
-    t_cost = sum(c.amount for c in cost_list if
-                 is_date_before_or_equal(c.date, threshold))
-    return t_inc - t_cost
+    total_income = sum(i.amount for i in income_list if
+                       is_date_before_or_equal(i.date, threshold))
+    total_cost = sum(c.amount for c in cost_list if
+                     is_date_before_or_equal(c.date, threshold))
+    return total_income - total_cost
 
 
 def extract_date(maybe_dt: str) -> tuple[int, int, int] | None:
@@ -159,7 +201,6 @@ def extract_date(maybe_dt: str) -> tuple[int, int, int] | None:
 
 def extract_amount(amount: str) -> float | None:
     normalized = amount.replace(",", ".")
-
     if normalized.count(".") > 1:
         return None
 
@@ -184,31 +225,15 @@ def is_valid_date(day: int, month: int, year: int) -> bool:
     return True
 
 
-def is_date_before_or_equal(curr: tuple[int, int, int],
-    thresh: tuple[int, int, int]) -> bool:
-    return (curr[2], curr[1], curr[0]) <= (thresh[2], thresh[1], thresh)
+def is_date_before_or_equal(current_date: tuple[int, int, int],
+    threshold_date: tuple[int, int, int]) -> bool:
+    return (current_date[2], current_date[1], current_date[0]) <= \
+        (threshold_date[2], threshold_date[1], threshold_date[0])
 
 
-def is_same_month(d1: tuple[int, int, int], d2: tuple[int, int, int]) -> bool:
-    return d1[1] == d2[1] and d1[2] == d2[2]
-
-
-def main() -> None:
-    while True:
-        line = input("Введите команду: ")
-        inp = line.split()
-        if not inp:
-            continue
-        cmd = inp[0]
-        args = inp[1:]
-        if cmd == "income" and len(args) == 2:
-            income_handler(args[0], args[1])
-        elif cmd == "cost" and len(args) == 3:
-            cost_handler(args[0], args[1], args[2])
-        elif cmd == "stats" and len(args) == 1:
-            stats_handler(args[0])
-        else:
-            print("Неизвестная команда!")
+def is_same_month(date_one: tuple[int, int, int],
+    date_two: tuple[int, int, int]) -> bool:
+    return date_one[1] == date_two[1] and date_one[2] == date_two[2]
 
 
 if __name__ == "__main__":
