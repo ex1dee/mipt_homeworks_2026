@@ -7,11 +7,11 @@ def main() -> None:
         if not line:
             break
 
-        inp = line.split()
-        if not inp:
+        input_parts = line.split()
+        if not input_parts:
             continue
 
-        match inp:
+        match input_parts:
             case ["income", amount, date]:
                 income_handler(amount, date)
             case ["cost", category, amount, date]:
@@ -27,10 +27,11 @@ class Income:
         self.amount: float = amount
         self.date: tuple[int, int, int] = date
 
-    def __getitem__(self, item: int) -> float | tuple[int, int, int] | None:
-        if item == 0:
+    def __getitem__(self, item: int | str) -> float | tuple[
+        int, int, int] | None:
+        if item == 0 or item == "amount":
             return self.amount
-        if item == 1:
+        if item == 1 or item == "date":
             return self.date
         return None
 
@@ -42,14 +43,15 @@ class Cost:
         self.amount: float = amount
         self.date: tuple[int, int, int] = date
 
-    def __getitem__(self, item: int) -> str | float | tuple[int, int, int]:
-        if item == 0:
+    def __getitem__(self, item: int | str) -> str | float | tuple[
+        int, int, int] | None:
+        if item == 0 or item == "category_name":
             return self.category_name
-        if item == 1:
+        if item == 1 or item == "amount":
             return self.amount
-        if item == 2:
+        if item == 2 or item == "date":
             return self.date
-        raise IndexError
+        return None
 
 
 financial_transactions_storage: list[Income | Cost] = []
@@ -80,134 +82,142 @@ class Dates:
     february_days: int = 28
 
 
-def income_handler(amount_str: str | float, date_str: str) -> bool:
-    extracted_amount = extract_amount(str(amount_str))
-    extracted_date = extract_date(date_str)
+def income_handler(amount_input: str | float, date_input: str) -> str:
+    extracted_amount = extract_amount(str(amount_input))
+    extracted_date = extract_date(date_input)
 
     if extracted_amount is None:
         print(NONPOSITIVE_VALUE_MSG)
-        return False
+        return NONPOSITIVE_VALUE_MSG
     if extracted_date is None:
         print(INCORRECT_DATE_MSG)
-        return False
+        return INCORRECT_DATE_MSG
 
     financial_transactions_storage.append(
         Income(extracted_amount, extracted_date))
+
     print(OP_SUCCESS_MSG)
-    return True
+    return OP_SUCCESS_MSG
 
 
-def cost_handler(category_name: str, amount_str: str | float,
-    date_str: str) -> bool:
-    extracted_amount = extract_amount(str(amount_str))
-    extracted_date = extract_date(date_str)
+def cost_handler(category_name: str, amount_input: str | float,
+    date_input: str) -> str:
+    extracted_amount = extract_amount(str(amount_input))
+    extracted_date = extract_date(date_input)
 
     if len(category_name) == 0 or any(char in category_name for char in ".,"):
         print(NOT_EXISTS_CATEGORY)
-        return False
+        return NOT_EXISTS_CATEGORY
+
     if extracted_amount is None:
         print(NONPOSITIVE_VALUE_MSG)
-        return False
+        return NONPOSITIVE_VALUE_MSG
+
     if extracted_date is None:
         print(INCORRECT_DATE_MSG)
-        return False
+        return INCORRECT_DATE_MSG
 
     if category_name not in EXPENSE_CATEGORIES:
         EXPENSE_CATEGORIES[category_name] = category_name
 
     financial_transactions_storage.append(
         Cost(category_name, extracted_amount, extracted_date))
+
     print(OP_SUCCESS_MSG)
-    return True
+    return OP_SUCCESS_MSG
 
 
 def cost_categories_handler() -> dict[str, str]:
-    for index, category in enumerate(sorted(EXPENSE_CATEGORIES.keys()), 1):
+    sorted_categories = sorted(EXPENSE_CATEGORIES.keys())
+    for index, category in enumerate(sorted_categories, 1):
         print(f"{index}. {category}")
     return EXPENSE_CATEGORIES
 
 
-def stats_handler(date_str: str) -> None:
-    date_val = extract_date(date_str)
-    if date_val is None:
+def stats_handler(date_input: str) -> None:
+    date_value = extract_date(date_input)
+    if date_value is None:
         print(INCORRECT_DATE_MSG)
         return
 
-    income_list: list[Income] = [t for t in financial_transactions_storage if
-                                 isinstance(t, Income)]
-    cost_list: list[Cost] = [t for t in financial_transactions_storage if
-                             isinstance(t, Cost)]
+    income_list: list[Income] = [transaction for transaction in
+                                 financial_transactions_storage if
+                                 isinstance(transaction, Income)]
+    cost_list: list[Cost] = [transaction for transaction in
+                             financial_transactions_storage if
+                             isinstance(transaction, Cost)]
 
-    total_capital = count_total_capital(date_val, income_list, cost_list)
+    total_capital = count_total_capital(date_value, income_list, cost_list)
 
-    month_income = [i.amount for i in income_list if
-                    is_same_month(i.date, date_val)]
-    month_cost = [c.amount for c in cost_list if
-                  is_same_month(c.date, date_val)]
+    monthly_income_amounts = [income.amount for income in income_list if
+                              is_same_month(income.date, date_value)]
+    monthly_cost_amounts = [cost.amount for cost in cost_list if
+                            is_same_month(cost.date, date_value)]
 
-    total_month_income = sum(month_income)
-    total_month_cost = sum(month_cost)
-    month_diff = total_month_income - total_month_cost
+    total_monthly_income = sum(monthly_income_amounts)
+    total_monthly_cost = sum(monthly_cost_amounts)
+    monthly_difference = total_monthly_income - total_monthly_cost
 
-    status_text = "прибыль" if month_diff >= 0 else "убыток"
-    status_suffix_text = "а" if month_diff >= 0 else ""
+    status_text = "прибыль" if monthly_difference >= 0 else "убыток"
+    status_suffix_text = "а" if monthly_difference >= 0 else ""
 
     print(stats_template.format(
-        date=date_str,
+        date=date_input,
         total_capital=total_capital,
         status=status_text,
         status_suffix=status_suffix_text,
-        month_diff=abs(month_diff),
-        month_income=total_month_income,
-        month_cost=total_month_cost
+        month_diff=abs(monthly_difference),
+        month_income=total_monthly_income,
+        month_cost=total_monthly_cost
     ))
 
-    current_month_costs = [c for c in cost_list if
-                           is_same_month(c.date, date_val)]
-    categories_sum = get_categories_map(current_month_costs)
+    current_month_costs = [cost for cost in cost_list if
+                           is_same_month(cost.date, date_value)]
+    categories_sum_map = get_categories_map(current_month_costs)
 
-    for index, category in enumerate(sorted(categories_sum.keys()), 1):
-        print(f"{index}. {category}: {categories_sum[category]:.0f}")
+    for index, category in enumerate(sorted(categories_sum_map.keys()), 1):
+        print(f"{index}. {category}: {categories_sum_map[category]:.0f}")
 
 
 def get_categories_map(costs: list[Cost]) -> dict[str, float]:
-    res: dict[str, float] = {}
-    for c in costs:
-        res[c.category_name] = res.get(c.category_name, 0.0) + c.amount
-    return res
+    result_map: dict[str, float] = {}
+    for cost in costs:
+        result_map[cost.category_name] = result_map.get(cost.category_name,
+                                                        0.0) + cost.amount
+    return result_map
 
 
-def count_total_capital(threshold: tuple[int, int, int],
+def count_total_capital(threshold_date: tuple[int, int, int],
     income_list: list[Income],
     cost_list: list[Cost]) -> float:
-    total_income = sum(i.amount for i in income_list if
-                       is_date_before_or_equal(i.date, threshold))
-    total_cost = sum(c.amount for c in cost_list if
-                     is_date_before_or_equal(c.date, threshold))
+    total_income = sum(income.amount for income in income_list if
+                       is_date_before_or_equal(income.date, threshold_date))
+    total_cost = sum(cost.amount for cost in cost_list if
+                     is_date_before_or_equal(cost.date, threshold_date))
     return total_income - total_cost
 
 
-def extract_date(maybe_dt: str) -> tuple[int, int, int] | None:
-    parts = maybe_dt.split("-")
-    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+def extract_date(date_string: str) -> tuple[int, int, int] | None:
+    date_parts = date_string.split("-")
+    if len(date_parts) != 3 or not all(part.isdigit() for part in date_parts):
         return None
 
-    day, month, year = map(int, parts)
+    day, month, year = map(int, date_parts)
     if is_valid_date(day, month, year):
         return day, month, year
 
     return None
 
 
-def extract_amount(amount: str) -> float | None:
-    normalized = amount.replace(",", ".")
-    if normalized.count(".") > 1:
+def extract_amount(amount_string: str) -> float | None:
+    normalized_amount = amount_string.replace(",", ".")
+    if normalized_amount.count(".") > 1:
         return None
 
-    if not normalized.replace(".", "", 1).isdigit():
+    if not normalized_amount.replace(".", "", 1).isdigit():
         return None
 
-    value = float(normalized)
+    value = float(normalized_amount)
     return value if value > 0 else None
 
 
@@ -219,8 +229,8 @@ def is_valid_date(day: int, month: int, year: int) -> bool:
         return False
 
     if month == 2:
-        leap = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
-        return day <= (29 if leap else 28)
+        is_leap = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+        return day <= (29 if is_leap else 28)
 
     return True
 
