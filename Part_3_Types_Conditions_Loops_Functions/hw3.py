@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# ruff: noqa: T201, RUF001
+# ruff: noqa: RUF001
 
 def main() -> None:
     while True:
@@ -29,9 +29,9 @@ class Income:
 
     def __getitem__(self, item: int | str) -> float | tuple[
         int, int, int] | None:
-        if item == 0 or item == "amount":
+        if item in {0, "amount"}:
             return self.amount
-        if item == 1 or item == "date":
+        if item in {1, "date"}:
             return self.date
         return None
 
@@ -45,11 +45,11 @@ class Cost:
 
     def __getitem__(self, item: int | str) -> str | float | tuple[
         int, int, int] | None:
-        if item == 0 or item == "category_name":
+        if item in {0, "category_name"}:
             return self.category_name
-        if item == 1 or item == "amount":
+        if item in {1, "amount"}:
             return self.amount
-        if item == 2 or item == "date":
+        if item in {2, "date"}:
             return self.date
         return None
 
@@ -127,7 +127,7 @@ def cost_handler(category_name: str, amount_input: str | float,
     return OP_SUCCESS_MSG
 
 
-def cost_categories_handler() -> dict[str, str]:
+def cost_categories_handler() -> dict[str, str] | str:
     sorted_categories = sorted(EXPENSE_CATEGORIES.keys())
     for index, category in enumerate(sorted_categories, 1):
         print(f"{index}. {category}")
@@ -198,8 +198,11 @@ def count_total_capital(threshold_date: tuple[int, int, int],
 
 
 def extract_date(date_string: str) -> tuple[int, int, int] | None:
+    expected_date_parts_count = 3
     date_parts = date_string.split("-")
-    if len(date_parts) != 3 or not all(part.isdigit() for part in date_parts):
+
+    if len(date_parts) != expected_date_parts_count or not all(
+        part.isdigit() for part in date_parts):
         return None
 
     day, month, year = map(int, date_parts)
@@ -222,15 +225,17 @@ def extract_amount(amount_string: str) -> float | None:
 
 
 def is_valid_date(day: int, month: int, year: int) -> bool:
-    if day < 1 or day > 31 or month < 1 or month > 12 or year < 0:
+    if day < 1 or day > Dates.max_day_in_month or \
+        month < 1 or month > Dates.months_in_year or year < 0:
         return False
 
-    if month in Dates.months_with_thirty_days and day > 30:
+    if month in Dates.months_with_thirty_days and day > Dates.max_day_in_short_month:
         return False
 
-    if month == 2:
+    if month == Dates.february_month:
         is_leap = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
-        return day <= (29 if is_leap else 28)
+        return day <= (
+            Dates.february_leap_days if is_leap else Dates.february_days)
 
     return True
 
