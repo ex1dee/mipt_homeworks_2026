@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 from typing import Any
 
 UNKNOWN_COMMAND_MSG = "Unknown command!"
@@ -21,6 +20,10 @@ LEAP_FEBRUARY_DAYS = 29
 NORMAL_FEBRUARY_DAYS = 28
 ZERO = float(0)
 
+AMOUNT_KEY = "amount"
+DATE_KEY = "date"
+CATEGORY_KEY = "category"
+
 STATS_TEMPLATE = (
     "Your statistics as of {date_str}:\n"
     "Total capital: {total_capital:.2f} rubles\n"
@@ -30,35 +33,10 @@ STATS_TEMPLATE = (
     "Details (category: amount):"
 )
 
-
-class Income:
-    def __init__(self, amount: float, date: tuple[int, int, int]) -> None:
-        self.amount, self.date = amount, date
-
-    def __getitem__(self, key: str) -> Any:
-        return {"amount": self.amount, "date": self.date}[key]
-
-    def __bool__(self) -> bool:
-        return self.amount > ZERO
-
-
-class Cost:
-    def __init__(self, category: str, amount: float,
-                 date: tuple[int, int, int]) -> None:
-        self.category_name, self.amount, self.date = category, amount, date
-
-    def __getitem__(self, key: str) -> Any:
-        m = {"category": self.category_name, "amount": self.amount,
-             "date": self.date}
-        return m[key]
-
-    def __bool__(self) -> bool:
-        return self.amount > ZERO
-
-
-financial_transactions_storage: list[Income | Cost] = []
-income_list: list[Income] = []
-cost_list: list[Cost] = []
+Transaction = dict[str, Any]
+financial_transactions_storage: list[Transaction] = []
+income_list: list[Transaction] = []
+cost_list: list[Transaction] = []
 EXPENSE_CATEGORIES = {
     "Food": ("Supermarket", "Restaurants", "FastFood", "Coffee", "Delivery"),
     "Transport": ("Taxi", "Public transport", "Gas", "Car service"),
@@ -112,10 +90,10 @@ def income_handler(amount_raw: str | float, date_raw: str) -> str:
         date_raw)
 
     if amount is None or date is None:
-        financial_transactions_storage.append(Income(ZERO, (1, 1, 2026)))
+        financial_transactions_storage.append({})
         return NONPOSITIVE_VALUE_MSG if amount is None else INCORRECT_DATE_MSG
 
-    new_income = Income(amount, date)
+    new_income = {AMOUNT_KEY: amount, DATE_KEY: date}
     income_list.append(new_income)
     financial_transactions_storage.append(new_income)
 
@@ -128,16 +106,14 @@ def cost_handler(category: str, amount_raw: str | float, date_raw: str) -> str:
 
     main_category = category.split("::")[0]
     if main_category not in EXPENSE_CATEGORIES:
-        financial_transactions_storage.append(
-            Cost(category, ZERO, (1, 1, 2026)))
+        financial_transactions_storage.append({})
         return NOT_EXISTS_CATEGORY
 
     if amount is None or date is None:
-        financial_transactions_storage.append(
-            Cost(category, ZERO, (1, 1, 2026)))
+        financial_transactions_storage.append({})
         return NONPOSITIVE_VALUE_MSG if amount is None else INCORRECT_DATE_MSG
 
-    new_cost = Cost(category, amount, date)
+    new_cost = {CATEGORY_KEY: category, AMOUNT_KEY: amount, DATE_KEY: date}
     cost_list.append(new_cost)
     financial_transactions_storage.append(new_cost)
 
@@ -159,9 +135,9 @@ def stats_handler(target_date_str: str) -> str:
         return INCORRECT_DATE_MSG
 
     month_income = sum(
-        i.amount for i in income_list if _is_same_month(i.date, target_date))
+        i[AMOUNT_KEY] for i in income_list if _is_same_month(i[DATE_KEY], target_date))
     month_cost = sum(
-        c.amount for c in cost_list if _is_same_month(c.date, target_date))
+        c[AMOUNT_KEY] for c in cost_list if _is_same_month(c[DATE_KEY], target_date))
 
     header = STATS_TEMPLATE.format(
         date_str=target_date_str,
@@ -181,27 +157,35 @@ def _get_category_details_msg(target_date: tuple[int, int, int]) -> str:
     summary: dict[str, float] = {}
 
     for cost in cost_list:
-        if _is_same_month(cost.date, target_date):
-            summary[cost.category_name] = summary.get(cost.category_name, ZERO) + cost.amount
+        if _is_same_month(cost[DATE_KEY], target_date):
+            current_sum = summary.get(cost[CATEGORY_KEY], ZERO)
+            summary[cost[CATEGORY_KEY]] = current_sum + cost[AMOUNT_KEY]
 
-    details: list[str] = []
+    if not summary:
+        return ""
 
-    for index, name in enumerate(sorted(summary.keys()), 1):
-        details.extend(f"{index}. {name}: {summary[name]:.0f}")
-
-    return "\n".join(details)
+    return "\n".join([
+        f"{index}. {category}: {summary[category]:.0f}"
+        for index, category in enumerate(sorted(summary.keys()), 1)
+    ])
 
 
 def _calculate_total_capital(threshold: tuple[int, int, int]) -> float:
     capital = ZERO
 
     for transaction in financial_transactions_storage:
-        if _is_before_or_equal(transaction.date, threshold):
-            value = transaction.amount if isinstance(transaction,
-                                                     Income) else -transaction.amount
+        if not transaction:
+            continue
+
+        if _is_before_or_equal(transaction[DATE_KEY], threshold):
+            value = -transaction[AMOUNT_KEY] if _is_cost(transaction) else transaction[AMOUNT_KEY]
             capital += value
 
     return capital
+
+
+def _is_cost(transaction: Transaction) -> bool:
+    return CATEGORY_KEY in transaction and AMOUNT_KEY in transaction and DATE_KEY in transaction
 
 
 def _extract_date_tuple(raw_date: str) -> tuple[int, int, int] | None:
