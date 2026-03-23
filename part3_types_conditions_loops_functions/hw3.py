@@ -62,17 +62,6 @@ cost_list: list[Cost] = []
 EXPENSE_CATEGORIES: dict[str, list[str]] = {"Прочее": ["Прочее"]}
 
 
-def _process_input(command: str, args: list[str]) -> None:
-    if command == "income" and len(args) == EXPECTED_INCOME_ARGS:
-        income_handler(args[0], args[1])
-    elif command == "cost" and len(args) == EXPECTED_COST_ARGS:
-        cost_handler(args[0], args[1], args[2])
-    elif command == "stats" and len(args) == EXPECTED_STATS_ARGS:
-        stats_handler(args[0])
-    else:
-        print(UNKNOWN_COMMAND_MSG)
-
-
 def main() -> None:
     while True:
         line = input("Введите команду: ")
@@ -84,8 +73,19 @@ def main() -> None:
             _process_input(parts[0], parts[1:])
 
 
+def _process_input(command: str, args: list[str]) -> None:
+    if command == "income" and len(args) == EXPECTED_INCOME_ARGS:
+        income_handler(args[0], args[1])
+    elif command == "cost" and len(args) == EXPECTED_COST_ARGS:
+        cost_handler(args[0], args[1], args[2])
+    elif command == "stats" and len(args) == EXPECTED_STATS_ARGS:
+        stats_handler(args[0])
+    else:
+        print(UNKNOWN_COMMAND_MSG)
+
+
 def income_handler(amount_raw: str | float, date_raw: str) -> str:
-    amount, date = extract_amount_value(amount_raw), extract_date_tuple(
+    amount, date = _extract_amount_value(amount_raw), _extract_date_tuple(
         date_raw)
 
     if amount is None or date is None:
@@ -103,7 +103,7 @@ def income_handler(amount_raw: str | float, date_raw: str) -> str:
 
 
 def cost_handler(category: str, amount_raw: str | float, date_raw: str) -> str:
-    amount, date = extract_amount_value(amount_raw), extract_date_tuple(
+    amount, date = _extract_amount_value(amount_raw), _extract_date_tuple(
         date_raw)
 
     main_category = category.split("::")[0]
@@ -140,22 +140,22 @@ def cost_categories_handler() -> str:
 
 
 def stats_handler(target_date_str: str) -> None:
-    target_date = extract_date_tuple(target_date_str)
+    target_date = _extract_date_tuple(target_date_str)
 
     if target_date is None:
         print(INCORRECT_DATE_MSG)
         return
 
     month_income = sum(
-        i.amount for i in income_list if is_same_month(i.date, target_date))
+        i.amount for i in income_list if _is_same_month(i.date, target_date))
     month_cost = sum(
-        c.amount for c in cost_list if is_same_month(c.date, target_date))
+        c.amount for c in cost_list if _is_same_month(c.date, target_date))
     month_diff = month_income - month_cost
     status_res = ("прибыль", "а") if month_diff >= 0 else ("убыток", "")
 
     print(S_TMPL.format(
         date_str=target_date_str,
-        total_capital=calculate_total_capital(target_date),
+        total_capital=_calculate_total_capital(target_date),
         status=status_res[0], status_suffix=status_res[1],
         month_difference=abs(month_diff), month_income=month_income,
         month_cost=month_cost
@@ -168,7 +168,7 @@ def _print_category_details(target_date: tuple[int, int, int]) -> None:
     summary: dict[str, float] = {}
 
     for cost in cost_list:
-        if is_same_month(cost.date, target_date):
+        if _is_same_month(cost.date, target_date):
             value = summary.get(cost.category_name, ZERO)
             summary[cost.category_name] = value + cost.amount
 
@@ -176,11 +176,11 @@ def _print_category_details(target_date: tuple[int, int, int]) -> None:
         print(f"{index}. {name}: {summary[name]:.0f}")
 
 
-def calculate_total_capital(threshold: tuple[int, int, int]) -> float:
+def _calculate_total_capital(threshold: tuple[int, int, int]) -> float:
     capital = ZERO
 
     for transaction in financial_transactions_storage:
-        if is_before_or_equal(transaction.date, threshold):
+        if _is_before_or_equal(transaction.date, threshold):
             value = transaction.amount if isinstance(transaction,
                                                      Income) else -transaction.amount
             capital += value
@@ -188,7 +188,7 @@ def calculate_total_capital(threshold: tuple[int, int, int]) -> float:
     return capital
 
 
-def extract_date_tuple(raw_date: str) -> tuple[int, int, int] | None:
+def _extract_date_tuple(raw_date: str) -> tuple[int, int, int] | None:
     if not isinstance(raw_date, str):
         return None
 
@@ -200,11 +200,11 @@ def extract_date_tuple(raw_date: str) -> tuple[int, int, int] | None:
         return None
 
     date, month, year = map(int, parts)
-    return (date, month, year) if is_valid_calendar_date(date, month,
-                                                         year) else None
+    return (date, month, year) if _is_valid_calendar_date(date, month,
+                                                          year) else None
 
 
-def extract_amount_value(raw_amount: str | float) -> float | None:
+def _extract_amount_value(raw_amount: str | float) -> float | None:
     if isinstance(raw_amount, (int, float)):
         return float(raw_amount) if float(raw_amount) > ZERO else None
     if not isinstance(raw_amount, str):
@@ -220,7 +220,7 @@ def extract_amount_value(raw_amount: str | float) -> float | None:
     return value if value > ZERO else None
 
 
-def is_valid_calendar_date(day: int, month: int, year: int) -> bool:
+def _is_valid_calendar_date(day: int, month: int, year: int) -> bool:
     if not (1 <= month <= MONTHS_IN_YEAR and year >= 0):
         return False
 
@@ -239,8 +239,8 @@ def is_valid_calendar_date(day: int, month: int, year: int) -> bool:
     return bool(1 <= day <= limit)
 
 
-def is_before_or_equal(fst_date: tuple[int, ...],
-                       snd_date: tuple[int, ...]) -> bool:
+def _is_before_or_equal(fst_date: tuple[int, ...],
+                        snd_date: tuple[int, ...]) -> bool:
     if fst_date[2] != snd_date[2]:
         return bool(fst_date[2] < snd_date[2])
     if fst_date[1] != snd_date[1]:
@@ -248,7 +248,7 @@ def is_before_or_equal(fst_date: tuple[int, ...],
     return bool(fst_date[0] <= snd_date[0])
 
 
-def is_same_month(fst_date: tuple[int, ...], snd_date: tuple[int, ...]) -> bool:
+def _is_same_month(fst_date: tuple[int, ...], snd_date: tuple[int, ...]) -> bool:
     m_ok = bool(fst_date[1] == snd_date[1])
     y_ok = bool(fst_date[2] == snd_date[2])
     return bool(m_ok and y_ok)
