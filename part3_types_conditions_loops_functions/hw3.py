@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# ruff: noqa: RUF001
 
 from typing import Any
 
@@ -10,6 +9,7 @@ NOT_EXISTS_CATEGORY = "Category not exists!"
 OP_SUCCESS_MSG = "Added"
 
 EXPECTED_INCOME_ARGS = 2
+EXPECTED_COST_CATEGORIES_ARGS = 1
 EXPECTED_COST_ARGS = 3
 EXPECTED_STATS_ARGS = 1
 DATE_PARTS_COUNT = 3
@@ -21,13 +21,13 @@ LEAP_FEBRUARY_DAYS = 29
 NORMAL_FEBRUARY_DAYS = 28
 ZERO = float(0)
 
-S_TMPL = (
-    "Ваша статистика по состоянию на {date_str}:\n"
-    "Суммарный капитал: {total_capital:.2f} рублей\n"
-    "В этом месяце {status} составил{status_suffix} {month_difference:.2f} рублей\n"
-    "Доходы: {month_income:.2f} рублей\n"
-    "Расходы: {month_cost:.2f} рублей\n\n"
-    "Детализация (категория: сумма):"
+STATS_TEMPLATE = (
+    "Your statistics as of {date_str}:\n"
+    "Total capital: {total_capital:.2f} rubles\n"
+    "This month, the {status} amounted to {month_difference:.2f} rubles.\n"
+    "Income: {month_income:.2f} rubles\n"
+    "Expenses: {month_cost:.2f} rubles\n\n"
+    "Details (category: amount):"
 )
 
 
@@ -59,7 +59,17 @@ class Cost:
 financial_transactions_storage: list[Income | Cost] = []
 income_list: list[Income] = []
 cost_list: list[Cost] = []
-EXPENSE_CATEGORIES: dict[str, list[str]] = {"Прочее": ["Прочее"]}
+EXPENSE_CATEGORIES = {
+    "Food": ("Supermarket", "Restaurants", "FastFood", "Coffee", "Delivery"),
+    "Transport": ("Taxi", "Public transport", "Gas", "Car service"),
+    "Housing": ("Rent", "Utilities", "Repairs", "Furniture"),
+    "Health": ("Pharmacy", "Doctors", "Dentist", "Lab tests"),
+    "Entertainment": ("Movies", "Concerts", "Games", "Subscriptions"),
+    "Clothing": ("Outerwear", "Casual", "Shoes", "Accessories"),
+    "Education": ("Courses", "Books", "Tutors"),
+    "Communications": ("Mobile", "Internet", "Subscriptions"),
+    "Other": ("SomeCategory", "SomeOtherCategory"),
+}
 
 
 def main() -> None:
@@ -78,14 +88,23 @@ def _process_input(command: str, args: list[str]) -> None:
 
     if command == "income" and len(args) == EXPECTED_INCOME_ARGS:
         result_msg = income_handler(args[0], args[1])
-    elif command == "cost" and len(args) == EXPECTED_COST_ARGS:
-        result_msg = cost_handler(args[0], args[1], args[2])
+    elif command == "cost":
+        result_msg = _handle_cost_command(args)
     elif command == "stats" and len(args) == EXPECTED_STATS_ARGS:
         result_msg = stats_handler(args[0])
     else:
         result_msg = UNKNOWN_COMMAND_MSG
 
     print(result_msg)
+
+
+def _handle_cost_command(args: list[str]) -> str:
+    if len(args) == EXPECTED_COST_CATEGORIES_ARGS and args[0] == "categories":
+        return cost_categories_handler()
+    if len(args) == EXPECTED_COST_ARGS:
+        return cost_handler(args[0], args[1], args[2])
+
+    return UNKNOWN_COMMAND_MSG
 
 
 def income_handler(amount_raw: str | float, date_raw: str) -> str:
@@ -128,7 +147,7 @@ def cost_handler(category: str, amount_raw: str | float, date_raw: str) -> str:
 def cost_categories_handler() -> str:
     categories: list[str] = []
 
-    for parent, subs in sorted(EXPENSE_CATEGORIES.items()):
+    for parent, subs in EXPENSE_CATEGORIES.items():
         categories.extend(f"{parent}::{sub}" for sub in subs)
 
     return "\n".join(categories)
@@ -136,7 +155,6 @@ def cost_categories_handler() -> str:
 
 def stats_handler(target_date_str: str) -> str:
     target_date = _extract_date_tuple(target_date_str)
-
     if target_date is None:
         return INCORRECT_DATE_MSG
 
@@ -144,18 +162,19 @@ def stats_handler(target_date_str: str) -> str:
         i.amount for i in income_list if _is_same_month(i.date, target_date))
     month_cost = sum(
         c.amount for c in cost_list if _is_same_month(c.date, target_date))
-    month_diff = month_income - month_cost
-    status_res = ("прибыль", "а") if month_diff >= 0 else ("убыток", "")
 
-    print(S_TMPL.format(
+    header = STATS_TEMPLATE.format(
         date_str=target_date_str,
         total_capital=_calculate_total_capital(target_date),
-        status=status_res[0], status_suffix=status_res[1],
-        month_difference=abs(month_diff), month_income=month_income,
+        status="profit" if (month_income - month_cost) >= 0 else "loss",
+        month_difference=abs(month_income - month_cost),
+        month_income=month_income,
         month_cost=month_cost
-    ))
+    )
 
-    return _get_category_details_msg(target_date)
+    details = _get_category_details_msg(target_date)
+
+    return f"{header}\n{details}" if details else header
 
 
 def _get_category_details_msg(target_date: tuple[int, int, int]) -> str:
