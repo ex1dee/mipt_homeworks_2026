@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 from typing import Any
 
 UNKNOWN_COMMAND_MSG = "Unknown command!"
@@ -8,7 +7,36 @@ INCORRECT_DATE_MSG = "Invalid date!"
 NOT_EXISTS_CATEGORY = "Category not exists!"
 OP_SUCCESS_MSG = "Added"
 
+EXPECTED_INCOME_ARGS = 2
+EXPECTED_COST_CATEGORIES_ARGS = 1
+EXPECTED_COST_ARGS = 3
+EXPECTED_STATS_ARGS = 1
+DATE_PARTS_COUNT = 3
+MONTHS_IN_YEAR = 12
+MAX_DAYS_IN_MONTH = 31
+STANDARD_MONTH_DAYS = 30
+FEBRUARY_INDEX = 2
+LEAP_FEBRUARY_DAYS = 29
+NORMAL_FEBRUARY_DAYS = 28
+ZERO = float(0)
 
+AMOUNT_KEY = "amount"
+DATE_KEY = "date"
+CATEGORY_KEY = "category"
+
+STATS_TEMPLATE = (
+    "Your statistics as of {date_str}:\n"
+    "Total capital: {total_capital:.2f} rubles\n"
+    "This month, the {status} amounted to {month_difference:.2f} rubles.\n"
+    "Income: {month_income:.2f} rubles\n"
+    "Expenses: {month_cost:.2f} rubles\n\n"
+    "Details (category: amount):"
+)
+
+Transaction = dict[str, Any]
+financial_transactions_storage: list[Transaction] = []
+income_list: list[Transaction] = []
+cost_list: list[Transaction] = []
 EXPENSE_CATEGORIES = {
     "Food": ("Supermarket", "Restaurants", "FastFood", "Coffee", "Delivery"),
     "Transport": ("Taxi", "Public transport", "Gas", "Car service"),
@@ -22,50 +50,208 @@ EXPENSE_CATEGORIES = {
 }
 
 
-financial_transactions_storage: list[dict[str, Any]] = []
+def main() -> None:
+    while True:
+        line = input("Введите команду: ")
+        if not line:
+            break
+
+        parts = line.split()
+        if parts:
+            _process_input(parts[0], parts[1:])
 
 
-def is_leap_year(year: int) -> bool:
-    """
-    Для заданного года определяет: високосный (True) или невисокосный (False).
+def _process_input(command: str, args: list[str]) -> None:
+    result_msg: str = ""
 
-    :param int year: Проверяемый год
-    :return: Значение високосности.
-    :rtype: bool
-    """
-    return bool(year)  # Change this
+    if command == "income" and len(args) == EXPECTED_INCOME_ARGS:
+        result_msg = income_handler(args[0], args[1])
+    elif command == "cost":
+        result_msg = _handle_cost_command(args)
+    elif command == "stats" and len(args) == EXPECTED_STATS_ARGS:
+        result_msg = stats_handler(args[0])
+    else:
+        result_msg = UNKNOWN_COMMAND_MSG
 
-
-def extract_date(maybe_dt: str) -> tuple[int, int, int] | None:
-    """
-    Парсит дату формата DD-MM-YYYY из строки.
-
-    :param str maybe_dt: Проверяемая строка
-    :return: typle формата (день, месяц, год) или None, если дата неправильная.
-    :rtype: tuple[int, int, int] | None
-    """
+    print(result_msg)
 
 
-def income_handler(amount: float, income_date: str) -> str:
-    financial_transactions_storage.append({"amount": amount, "date": income_date})
+def _handle_cost_command(args: list[str]) -> str:
+    if len(args) == EXPECTED_COST_CATEGORIES_ARGS and args[0] == "categories":
+        return cost_categories_handler()
+    if len(args) == EXPECTED_COST_ARGS:
+        return cost_handler(args[0], args[1], args[2])
+
+    return UNKNOWN_COMMAND_MSG
+
+
+def income_handler(amount_raw: str | float, date_raw: str) -> str:
+    amount, date = _extract_amount_value(amount_raw), _extract_date_tuple(
+        date_raw)
+
+    if amount is None or date is None:
+        financial_transactions_storage.append({})
+        return NONPOSITIVE_VALUE_MSG if amount is None else INCORRECT_DATE_MSG
+
+    new_income = {AMOUNT_KEY: amount, DATE_KEY: date}
+    income_list.append(new_income)
+    financial_transactions_storage.append(new_income)
+
     return OP_SUCCESS_MSG
 
 
-def cost_handler(category_name: str, amount: float, income_date: str) -> str:
-    financial_transactions_storage.append({"category": category_name, "amount": amount, "date": income_date})
+def cost_handler(category: str, amount_raw: str | float, date_raw: str) -> str:
+    amount, date = _extract_amount_value(amount_raw), _extract_date_tuple(
+        date_raw)
+
+    main_category = category.split("::")[0]
+    if main_category not in EXPENSE_CATEGORIES:
+        financial_transactions_storage.append({})
+        return NOT_EXISTS_CATEGORY
+
+    if amount is None or date is None:
+        financial_transactions_storage.append({})
+        return NONPOSITIVE_VALUE_MSG if amount is None else INCORRECT_DATE_MSG
+
+    new_cost = {CATEGORY_KEY: category, AMOUNT_KEY: amount, DATE_KEY: date}
+    cost_list.append(new_cost)
+    financial_transactions_storage.append(new_cost)
+
     return OP_SUCCESS_MSG
 
 
 def cost_categories_handler() -> str:
-    return "\n".join({})
+    categories: list[str] = []
+
+    for parent, subs in EXPENSE_CATEGORIES.items():
+        categories.extend(f"{parent}::{sub}" for sub in subs)
+
+    return "\n".join(categories)
 
 
-def stats_handler(report_date: str) -> str:
-    return f"Statistic for {report_date}"
+def stats_handler(target_date_str: str) -> str:
+    target_date = _extract_date_tuple(target_date_str)
+    if target_date is None:
+        return INCORRECT_DATE_MSG
+
+    month_income = sum(
+        i[AMOUNT_KEY] for i in income_list if _is_same_month(i[DATE_KEY], target_date))
+    month_cost = sum(
+        c[AMOUNT_KEY] for c in cost_list if _is_same_month(c[DATE_KEY], target_date))
+
+    header = STATS_TEMPLATE.format(
+        date_str=target_date_str,
+        total_capital=_calculate_total_capital(target_date),
+        status="profit" if (month_income - month_cost) >= 0 else "loss",
+        month_difference=abs(month_income - month_cost),
+        month_income=month_income,
+        month_cost=month_cost
+    )
+
+    details = _get_category_details_msg(target_date)
+
+    return f"{header}\n{details}" if details else header
 
 
-def main() -> None:
-    """Ваш код здесь"""
+def _get_category_details_msg(target_date: tuple[int, int, int]) -> str:
+    summary: dict[str, float] = {}
+
+    for cost in cost_list:
+        if _is_same_month(cost[DATE_KEY], target_date):
+            current_sum = summary.get(cost[CATEGORY_KEY], ZERO)
+            summary[cost[CATEGORY_KEY]] = current_sum + cost[AMOUNT_KEY]
+
+    if not summary:
+        return ""
+
+    return "\n".join([
+        f"{index}. {category}: {summary[category]:.0f}"
+        for index, category in enumerate(sorted(summary.keys()), 1)
+    ])
+
+
+def _calculate_total_capital(threshold: tuple[int, int, int]) -> float:
+    capital = ZERO
+
+    for transaction in financial_transactions_storage:
+        if not transaction:
+            continue
+
+        if _is_before_or_equal(transaction[DATE_KEY], threshold):
+            value = -transaction[AMOUNT_KEY] if _is_cost(transaction) else transaction[AMOUNT_KEY]
+            capital += value
+
+    return capital
+
+
+def _is_cost(transaction: Transaction) -> bool:
+    return CATEGORY_KEY in transaction and AMOUNT_KEY in transaction and DATE_KEY in transaction
+
+
+def _extract_date_tuple(raw_date: str) -> tuple[int, int, int] | None:
+    if not isinstance(raw_date, str):
+        return None
+
+    parts = raw_date.split("-")
+
+    if len(parts) != DATE_PARTS_COUNT:
+        return None
+    if not all(p.isdigit() for p in parts):
+        return None
+
+    date, month, year = map(int, parts)
+    return (date, month, year) if _is_valid_calendar_date(date, month,
+                                                          year) else None
+
+
+def _extract_amount_value(raw_amount: str | float) -> float | None:
+    if isinstance(raw_amount, (int, float)):
+        return float(raw_amount) if float(raw_amount) > ZERO else None
+    if not isinstance(raw_amount, str):
+        return None
+
+    normalized = raw_amount.replace(",", ".")
+    is_numeric = normalized.replace(".", "", 1).lstrip("-").isdigit()
+
+    if normalized.count(".") > 1 or not is_numeric:
+        return None
+
+    value = float(normalized)
+    return value if value > ZERO else None
+
+
+def _is_valid_calendar_date(day: int, month: int, year: int) -> bool:
+    if not (1 <= month <= MONTHS_IN_YEAR and year >= 0):
+        return False
+
+    limit = MAX_DAYS_IN_MONTH
+
+    if month in {4, 6, 9, 11}:
+        limit = STANDARD_MONTH_DAYS
+
+    if month == FEBRUARY_INDEX:
+        d4 = bool(year % 4 == 0)
+        d100 = bool(year % 100 == 0)
+        d400 = bool(year % 400 == 0)
+        is_leap = bool((d4 and not d100) or d400)
+        limit = LEAP_FEBRUARY_DAYS if is_leap else NORMAL_FEBRUARY_DAYS
+
+    return bool(1 <= day <= limit)
+
+
+def _is_before_or_equal(fst_date: tuple[int, ...],
+                        snd_date: tuple[int, ...]) -> bool:
+    if fst_date[2] != snd_date[2]:
+        return bool(fst_date[2] < snd_date[2])
+    if fst_date[1] != snd_date[1]:
+        return bool(fst_date[1] < snd_date[1])
+    return bool(fst_date[0] <= snd_date[0])
+
+
+def _is_same_month(fst_date: tuple[int, ...], snd_date: tuple[int, ...]) -> bool:
+    m_ok = bool(fst_date[1] == snd_date[1])
+    y_ok = bool(fst_date[2] == snd_date[2])
+    return bool(m_ok and y_ok)
 
 
 if __name__ == "__main__":
