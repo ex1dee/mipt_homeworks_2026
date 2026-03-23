@@ -74,14 +74,18 @@ def main() -> None:
 
 
 def _process_input(command: str, args: list[str]) -> None:
+    result_msg: str = ""
+
     if command == "income" and len(args) == EXPECTED_INCOME_ARGS:
-        income_handler(args[0], args[1])
+        result_msg = income_handler(args[0], args[1])
     elif command == "cost" and len(args) == EXPECTED_COST_ARGS:
-        cost_handler(args[0], args[1], args[2])
+        result_msg = cost_handler(args[0], args[1], args[2])
     elif command == "stats" and len(args) == EXPECTED_STATS_ARGS:
-        stats_handler(args[0])
+        result_msg = stats_handler(args[0])
     else:
-        print(UNKNOWN_COMMAND_MSG)
+        result_msg = UNKNOWN_COMMAND_MSG
+
+    print(result_msg)
 
 
 def income_handler(amount_raw: str | float, date_raw: str) -> str:
@@ -90,15 +94,12 @@ def income_handler(amount_raw: str | float, date_raw: str) -> str:
 
     if amount is None or date is None:
         financial_transactions_storage.append(Income(ZERO, (1, 1, 2026)))
-        msg = NONPOSITIVE_VALUE_MSG if amount is None else INCORRECT_DATE_MSG
-        print(msg)
-        return msg
+        return NONPOSITIVE_VALUE_MSG if amount is None else INCORRECT_DATE_MSG
 
     new_income = Income(amount, date)
     income_list.append(new_income)
     financial_transactions_storage.append(new_income)
 
-    print(OP_SUCCESS_MSG)
     return OP_SUCCESS_MSG
 
 
@@ -110,21 +111,17 @@ def cost_handler(category: str, amount_raw: str | float, date_raw: str) -> str:
     if main_category not in EXPENSE_CATEGORIES:
         financial_transactions_storage.append(
             Cost(category, ZERO, (1, 1, 2026)))
-        print(NOT_EXISTS_CATEGORY)
         return NOT_EXISTS_CATEGORY
 
     if amount is None or date is None:
         financial_transactions_storage.append(
             Cost(category, ZERO, (1, 1, 2026)))
-        msg = NONPOSITIVE_VALUE_MSG if amount is None else INCORRECT_DATE_MSG
-        print(msg)
-        return msg
+        return NONPOSITIVE_VALUE_MSG if amount is None else INCORRECT_DATE_MSG
 
     new_cost = Cost(category, amount, date)
     cost_list.append(new_cost)
     financial_transactions_storage.append(new_cost)
 
-    print(OP_SUCCESS_MSG)
     return OP_SUCCESS_MSG
 
 
@@ -134,17 +131,14 @@ def cost_categories_handler() -> str:
     for parent, subs in sorted(EXPENSE_CATEGORIES.items()):
         categories.extend(f"{parent}::{sub}" for sub in subs)
 
-    output = "\n".join(categories)
-    print(output)
-    return output
+    return "\n".join(categories)
 
 
-def stats_handler(target_date_str: str) -> None:
+def stats_handler(target_date_str: str) -> str:
     target_date = _extract_date_tuple(target_date_str)
 
     if target_date is None:
-        print(INCORRECT_DATE_MSG)
-        return
+        return INCORRECT_DATE_MSG
 
     month_income = sum(
         i.amount for i in income_list if _is_same_month(i.date, target_date))
@@ -161,19 +155,22 @@ def stats_handler(target_date_str: str) -> None:
         month_cost=month_cost
     ))
 
-    _print_category_details(target_date)
+    return _get_category_details_msg(target_date)
 
 
-def _print_category_details(target_date: tuple[int, int, int]) -> None:
+def _get_category_details_msg(target_date: tuple[int, int, int]) -> str:
     summary: dict[str, float] = {}
 
     for cost in cost_list:
         if _is_same_month(cost.date, target_date):
-            value = summary.get(cost.category_name, ZERO)
-            summary[cost.category_name] = value + cost.amount
+            summary[cost.category_name] = summary.get(cost.category_name, ZERO) + cost.amount
+
+    details: list[str] = []
 
     for index, name in enumerate(sorted(summary.keys()), 1):
-        print(f"{index}. {name}: {summary[name]:.0f}")
+        details.extend(f"{index}. {name}: {summary[name]:.0f}")
+
+    return "\n".join(details)
 
 
 def _calculate_total_capital(threshold: tuple[int, int, int]) -> float:
