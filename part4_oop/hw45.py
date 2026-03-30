@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, TypeVar, Self
+from typing import Any, Self, TypeVar
 
 from part4_oop.interfaces import Cache, HasCache, Policy, Storage
 
@@ -34,7 +34,7 @@ class BaseOrderPolicy(Policy[K]):
     _order: list[K] = field(default_factory=list, init=False)
 
     def get_key_to_evict(self) -> K | None:
-        if len(self._order) >= self.capacity:
+        if len(self._order) > self.capacity:
             return self._order[0]
 
         return None
@@ -69,22 +69,36 @@ class LRUPolicy(BaseOrderPolicy[K]):
 class LFUPolicy(Policy[K]):
     capacity: int = 5
     _key_counter: dict[K, int] = field(default_factory=dict, init=False)
+    _order: list[K] = field(default_factory=list, init=False)
 
     def register_access(self, key: K) -> None:
+        if key not in self._key_counter:
+            self._order.append(key)
+
         current_count = self._key_counter.get(key, 0)
         self._key_counter[key] = current_count + 1
 
     def get_key_to_evict(self) -> K | None:
-        if len(self._key_counter) >= self.capacity:
-            return min(self._key_counter, key=lambda k: self._key_counter.get(k, 0))
+        if len(self._key_counter) <= self.capacity:
+            return None
+
+        evictable_keys = self._order[: self.capacity]
+        min_count = min(self._key_counter[key] for key in evictable_keys)
+
+        for key in self._order:
+            if self._key_counter[key] == min_count:
+                return key
 
         return None
 
     def remove_key(self, key: K) -> None:
         self._key_counter.pop(key, None)
+        if key in self._order:
+            self._order.remove(key)
 
     def clear(self) -> None:
         self._key_counter.clear()
+        self._order.clear()
 
     @property
     def has_keys(self) -> bool:
