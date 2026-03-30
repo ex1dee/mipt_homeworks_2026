@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Self
 
 from part4_oop.interfaces import Cache, HasCache, Policy, Storage
 
@@ -29,13 +29,9 @@ class DictStorage(Storage[K, V]):
 
 
 @dataclass
-class FIFOPolicy(Policy[K]):
+class BaseOrderPolicy(Policy[K]):
     capacity: int = 5
     _order: list[K] = field(default_factory=list, init=False)
-
-    def register_access(self, key: K) -> None:
-        if key not in self._order:
-            self._order.append(key)
 
     def get_key_to_evict(self) -> K | None:
         if len(self._order) >= self.capacity:
@@ -56,33 +52,17 @@ class FIFOPolicy(Policy[K]):
 
 
 @dataclass
-class LRUPolicy(Policy[K]):
-    capacity: int = 5
-    _order: list[K] = field(default_factory=list, init=False)
-
+class FIFOPolicy(BaseOrderPolicy[K]):
     def register_access(self, key: K) -> None:
-        if key in self._order:
-            key_index = self._order.index(key)
-            self._order.pop(key_index)
+        if key not in self._order:
+            self._order.append(key)
 
+
+@dataclass
+class LRUPolicy(BaseOrderPolicy[K]):
+    def register_access(self, key: K) -> None:
+        self.remove_key(key)
         self._order.append(key)
-
-    def get_key_to_evict(self) -> K | None:
-        if len(self._order) >= self.capacity:
-            return self._order[0]
-
-        return None
-
-    def remove_key(self, key: K) -> None:
-        if key in self._order:
-            self._order.remove(key)
-
-    def clear(self) -> None:
-        self._order.clear()
-
-    @property
-    def has_keys(self) -> bool:
-        return len(self._order) > 0
 
 
 @dataclass
@@ -101,7 +81,7 @@ class LFUPolicy(Policy[K]):
         return None
 
     def remove_key(self, key: K) -> None:
-        self._key_counter.pop(key)
+        self._key_counter.pop(key, None)
 
     def clear(self) -> None:
         self._key_counter.clear()
@@ -146,9 +126,9 @@ class CachedProperty[V]:
         self.func = func
         self.__attr_name = func.__name__
 
-    def __get__(self, instance: HasCache[Any, Any] | None, owner: type) -> V:
+    def __get__(self, instance: HasCache[Any, Any] | None, owner: type) -> Self | V:
         if instance is None:
-            return self  # type: ignore[return-value]
+            return self
 
         result = instance.cache.get(self.__attr_name)
 
