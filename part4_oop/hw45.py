@@ -29,7 +29,7 @@ class DictStorage(Storage[K, V]):
 
 
 @dataclass
-class BaseOrderPolicy(Policy[K]):
+class _BaseOrderPolicy(Policy[K]):
     capacity: int = 5
     _order: list[K] = field(default_factory=list, init=False)
 
@@ -52,14 +52,14 @@ class BaseOrderPolicy(Policy[K]):
 
 
 @dataclass
-class FIFOPolicy(BaseOrderPolicy[K]):
+class FIFOPolicy(_BaseOrderPolicy[K]):
     def register_access(self, key: K) -> None:
         if key not in self._order:
             self._order.append(key)
 
 
 @dataclass
-class LRUPolicy(BaseOrderPolicy[K]):
+class LRUPolicy(_BaseOrderPolicy[K]):
     def register_access(self, key: K) -> None:
         self.remove_key(key)
         self._order.append(key)
@@ -116,12 +116,16 @@ class MIPTCache(Cache[K, V]):
 
         victim = self.policy.get_key_to_evict()
 
-        if victim:
+        if victim is not None:
             self.remove(victim)
 
     def get(self, key: K) -> V | None:
-        self.policy.register_access(key)
-        return self.storage.get(key)
+        value = self.storage.get(key)
+
+        if value is not None:
+            self.policy.register_access(key)
+
+        return value
 
     def exists(self, key: K) -> bool:
         return self.storage.exists(key)
