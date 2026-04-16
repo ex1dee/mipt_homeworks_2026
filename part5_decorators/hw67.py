@@ -30,10 +30,10 @@ class BreakerError(Exception):
 
 class CircuitBreaker:
     def __init__(
-            self,
-            critical_count: int = 5,
-            time_to_recover: int = 30,
-            triggers_on: type[Exception] = Exception,
+        self,
+        critical_count: int = 5,
+        time_to_recover: int = 30,
+        triggers_on: type[Exception] = Exception,
     ):
         self.__validate_init_data(critical_count, time_to_recover)
 
