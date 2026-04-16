@@ -35,7 +35,7 @@ class CircuitBreaker:
         time_to_recover: int = 30,
         triggers_on: type[Exception] = Exception,
     ):
-        self.__validate_init_data(critical_count, time_to_recover)
+        self._validate_init_data(critical_count, time_to_recover)
 
         self.critical_count = critical_count
         self.time_to_recover = time_to_recover
@@ -47,13 +47,7 @@ class CircuitBreaker:
     def __call__(self, func: CallableWithMeta[P, R_co]) -> CallableWithMeta[P, R_co]:
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R_co:
-            now = self.__get_datetime_now()
-
-            if self.errors_counter >= self.critical_count and self.last_blocked_at:
-                time_since_block = (now - self.last_blocked_at).total_seconds()
-
-                if time_since_block < self.time_to_recover:
-                    raise self.__get_breaker_error(func)
+            self._check_if_blocked(func)
 
             try:
                 result = func(*args, **kwargs)
@@ -61,29 +55,42 @@ class CircuitBreaker:
                 self.errors_counter += 1
 
                 if self.errors_counter >= self.critical_count:
-                    self.last_blocked_at = now
-                    raise self.__get_breaker_error(func) from error
+                    self.last_blocked_at = self._get_datetime_now()
+                    raise self._get_breaker_error(func) from error
 
                 raise
 
-            self.last_blocked_at = None
-            self.errors_counter = 0
+            self._reset()
 
             return result
 
         return cast("CallableWithMeta[P, R_co]", cast("object", wrapper))
 
-    def __get_breaker_error(self, func: CallableWithMeta[P, R_co]) -> BreakerError:
+    def _check_if_blocked(self, func: CallableWithMeta[P, R_co]) -> None:
+        if self.errors_counter < self.critical_count or not self.last_blocked_at:
+            return
+
+        now = self._get_datetime_now()
+        time_since_block = (now - self.last_blocked_at).total_seconds()
+
+        if time_since_block < self.time_to_recover:
+            raise self._get_breaker_error(func)
+
+    def _reset(self) -> None:
+        self.last_blocked_at = None
+        self.errors_counter = 0
+
+    def _get_breaker_error(self, func: CallableWithMeta[P, R_co]) -> BreakerError:
         func_name = f"{func.__module__}.{func.__name__}"
-        block_time = self.last_blocked_at or self.__get_datetime_now()
+        block_time = self.last_blocked_at or self._get_datetime_now()
         return BreakerError(TOO_MUCH, func_name, block_time)
 
-    @staticmethod
-    def __get_datetime_now() -> datetime:
+    @classmethod
+    def _get_datetime_now(cls) -> datetime:
         return datetime.now(UTC)
 
-    @staticmethod
-    def __validate_init_data(critical_count: int, time_to_recover: int) -> None:
+    @classmethod
+    def _validate_init_data(cls, critical_count: int, time_to_recover: int) -> None:
         errors = []
 
         if not isinstance(critical_count, int) or critical_count <= 0:
