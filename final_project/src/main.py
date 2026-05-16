@@ -7,11 +7,23 @@ from final_project.src.chat_manager import ChatManager
 from final_project.src.api import GigaChatAdapter
 from final_project.src.constants import Messages, ROLE_USER, ROLE_ASSISTANT
 from final_project.src.exceptions import GigaChatError
-from final_project.src.utils import console, clear_chat, print_system, print_error, print_assistant_prefix
+from final_project.src.utils import (
+    console,
+    clear_chat,
+    print_system,
+    print_error,
+    print_assistant_prefix,
+)
 from final_project.src.commands import (
-    handle_new, handle_list, handle_switch,
-    handle_rename, handle_delete, handle_clear,
-    handle_help, handle_exit, handle_delete_all
+    handle_new,
+    handle_list,
+    handle_switch,
+    handle_rename,
+    handle_delete,
+    handle_clear,
+    handle_help,
+    handle_exit,
+    handle_delete_all,
 )
 
 
@@ -25,8 +37,8 @@ def process_ai_response(user_text: str, manager: ChatManager, api: GigaChatAdapt
 
         print_assistant_prefix()
 
-        full_response = ""
-        with Live("", refresh_per_second=12, console=console, vertical_overflow="visible") as live:
+        full_response = ''
+        with Live('', refresh_per_second=12, console=console, vertical_overflow='visible') as live:
             for chunk in api.get_stream_response(session.history):
                 full_response += chunk
                 live.update(Markdown(full_response))
@@ -45,7 +57,7 @@ def process_ai_response(user_text: str, manager: ChatManager, api: GigaChatAdapt
 def main():
     try:
         api = GigaChatAdapter()
-        system_prompt = PROMPTS["system_main"]
+        system_prompt = PROMPTS['system_main']
 
         manager = ChatManager(system_prompt=system_prompt)
 
@@ -63,29 +75,29 @@ def main():
                 if not user_input:
                     continue
 
-                if user_input.startswith("/"):
+                if user_input.startswith('/'):
                     parts = user_input.split()
                     cmd = parts[0].lower()
                     args = parts[1:]
 
                     match cmd:
-                        case "/new":
+                        case '/new':
                             handle_new(manager, args)
-                        case "/list":
+                        case '/list':
                             handle_list(manager)
-                        case "/switch":
+                        case '/switch':
                             handle_switch(manager, args)
-                        case "/rename":
+                        case '/rename':
                             handle_rename(manager, args)
-                        case "/delete":
+                        case '/delete':
                             handle_delete(manager, args)
-                        case "/delete-all":
+                        case '/delete-all':
                             handle_delete_all(manager)
-                        case "/clear":
+                        case '/clear':
                             handle_clear(manager)
-                        case "/help":
+                        case '/help':
                             handle_help()
-                        case "/exit":
+                        case '/exit':
                             handle_exit()
                         case _:
                             print_error(Messages.UNKNOWN_COMMAND)
@@ -103,5 +115,5 @@ def main():
         sys.exit(1)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

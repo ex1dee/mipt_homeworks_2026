@@ -16,21 +16,21 @@ class ChatSession:
     system_prompt: str
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     history: List[Dict[str, str]] = field(default_factory=list)
-    created_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    created_at: str = field(default_factory=lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     def __post_init__(self) -> None:
         if not self.history:
-            self.history.append({"role": ROLE_SYSTEM, "content": self.system_prompt})
+            self.history.append({'role': ROLE_SYSTEM, 'content': self.system_prompt})
 
     def add_message(self, role: str, content: str) -> None:
-        self.history.append({"role": role, "content": content})
+        self.history.append({'role': role, 'content': content})
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "id": self.id,
-            "name": self.name,
-            "history": self.history,
-            "created_at": self.created_at
+            'id': self.id,
+            'name': self.name,
+            'history': self.history,
+            'created_at': self.created_at,
         }
 
 
@@ -54,7 +54,7 @@ class ChatManager:
     def create_chat(self, name: Optional[str] = None) -> ChatSession:
         if name is None:
             display_idx = len(self.sessions) + 1
-            name = f"{Messages.NEW_CHAT_PREFIX}{display_idx}"
+            name = f'{Messages.NEW_CHAT_PREFIX}{display_idx}'
 
         session = ChatSession(name=name, system_prompt=self.system_prompt)
         self.sessions.append(session)
@@ -143,19 +143,19 @@ class ChatManager:
         loaded_sessions = []
 
         for filename in os.listdir(self.storage_dir):
-            if filename.startswith("chat_") and filename.endswith(".json"):
+            if filename.startswith('chat_') and filename.endswith('.json'):
                 file_path = os.path.join(self.storage_dir, filename)
 
                 try:
-                    with open(file_path, "r", encoding='utf-8') as file:
+                    with open(file_path, 'r', encoding='utf-8') as file:
                         data = json.load(file)
 
                         session = ChatSession(
-                            id=data["id"],
-                            name=data["name"],
-                            history=data["history"],
-                            created_at=data["created_at"],
-                            system_prompt=self.system_prompt
+                            id=data['id'],
+                            name=data['name'],
+                            history=data['history'],
+                            created_at=data['created_at'],
+                            system_prompt=self.system_prompt,
                         )
 
                         loaded_sessions.append(session)
@@ -175,13 +175,13 @@ class ChatManager:
         file_path = self._get_chat_filename(session.id)
 
         try:
-            with open(file_path, "w", encoding='utf-8') as file:
+            with open(file_path, 'w', encoding='utf-8') as file:
                 json.dump(session.to_dict(), file, ensure_ascii=False, indent=4)
         except Exception as e:
             print(Messages.SAVE_CHAT_ERROR.format(error=e))
 
     def _get_chat_filename(self, chat_id: str) -> str:
-        return os.path.join(self.storage_dir, f"chat_{chat_id}.json")
+        return os.path.join(self.storage_dir, f'chat_{chat_id}.json')
 
     def _get_idx_by_specified(self, display_idx: Optional[int]) -> int:
         if display_idx is None:

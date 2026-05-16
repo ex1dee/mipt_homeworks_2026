@@ -5,10 +5,7 @@ from typing import List, Callable, Any
 from chat_manager import ChatManager
 from final_project.src.constants import Messages, DEFAULT_PAGE_SIZE
 from final_project.src.utils import print_help, print_chat_history, clear_console
-from utils import (
-    print_system, print_error, show_paged_chats,
-    clear_chat, console
-)
+from utils import print_system, print_error, show_paged_chats, clear_chat, console
 
 
 def command_error_handler(func: Callable) -> Callable:
@@ -24,7 +21,7 @@ def command_error_handler(func: Callable) -> Callable:
 
 @command_error_handler
 def handle_new(manager: ChatManager, args: List[str]) -> None:
-    name = " ".join(args) if args else None
+    name = ' '.join(args) if args else None
     session = manager.create_chat(name)
 
     clear_chat(session.name)
@@ -37,15 +34,17 @@ def handle_rename(manager: ChatManager, args: List[str]) -> None:
 
     if is_specified_chat:
         display_idx = int(args[0])
-        new_name = " ".join(args[1:])
+        new_name = ' '.join(args[1:])
     else:
         display_idx = None
-        new_name = " ".join(args)
+        new_name = ' '.join(args)
 
     manager.rename_chat(display_idx, new_name)
 
     if is_specified_chat:
-        print_system(Messages.SPECIFIED_CHAT_RENAMED.format(display_idx=display_idx, new_name=new_name))
+        print_system(
+            Messages.SPECIFIED_CHAT_RENAMED.format(display_idx=display_idx, new_name=new_name)
+        )
     else:
         print_system(Messages.CURRENT_CHAT_RENAMED.format(new_name=new_name))
 
@@ -139,5 +138,5 @@ def handle_help() -> None:
 
 
 def handle_exit() -> None:
-    print_system("Завершение сессии...")
+    print_system('Завершение сессии...')
     sys.exit(0)
